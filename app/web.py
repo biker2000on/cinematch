@@ -6,7 +6,7 @@ import logging
 import time
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from . import engine
 from .config import config
@@ -45,6 +45,19 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="cinematch", lifespan=_lifespan)
+
+
+FAVICON_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+    "<text y='.9em' font-size='90'>\U0001f3ac</text></svg>"
+)
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/healthz")
@@ -95,6 +108,7 @@ async def dashboard():
         </div>""")
     profile = " &middot; ".join(f"{html.escape(g)} {round(w * 100)}%" for g, w in (run.get("genre_profile") or {}).items())
     body = f"""<!doctype html><html><head><meta charset="utf-8"><title>cinematch</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
       body {{ font-family: system-ui, sans-serif; background:#111; color:#eee; margin:0; padding:2rem; }}
       h1 {{ margin:0 0 .25rem; }} .sub {{ color:#999; margin-bottom:1.5rem; }}

@@ -28,6 +28,45 @@ def _parse_date(s: str | None) -> float:
         return 0.0
 
 
+async def library_tmdb_ids(client: httpx.AsyncClient) -> set[int]:
+    """TMDB ids of every movie in the Jellyfin library (watched or not)."""
+    if not (config.JELLYFIN_URL and config.JELLYFIN_API_KEY):
+        return set()
+    headers = {"X-Emby-Token": config.JELLYFIN_API_KEY}
+    r = await client.get(f"{config.JELLYFIN_URL}/Users", headers=headers)
+    r.raise_for_status()
+    users = r.json()
+    if not users:
+        return set()
+
+    ids: set[int] = set()
+    start = 0
+    while True:
+        r = await client.get(
+            f"{config.JELLYFIN_URL}/Users/{users[0]['Id']}/Items",
+            params={
+                "IncludeItemTypes": "Movie",
+                "Recursive": "true",
+                "Fields": "ProviderIds",
+                "StartIndex": start,
+                "Limit": 500,
+            },
+            headers=headers,
+        )
+        r.raise_for_status()
+        data = r.json()
+        items = data.get("Items", [])
+        for it in items:
+            tmdb = (it.get("ProviderIds") or {}).get("Tmdb")
+            if tmdb:
+                ids.add(int(tmdb))
+        start += len(items)
+        if not items or start >= data.get("TotalRecordCount", 0):
+            break
+    log.info("jellyfin: %d movies in library catalog", len(ids))
+    return ids
+
+
 async def collect(client: httpx.AsyncClient) -> dict[int, dict]:
     """Return {tmdb_id: {title, last_watched, play_count, user_rating, sources}}."""
     if not (config.JELLYFIN_URL and config.JELLYFIN_API_KEY):

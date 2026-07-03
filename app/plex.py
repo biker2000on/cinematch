@@ -88,6 +88,45 @@ async def collect(client: httpx.AsyncClient) -> dict[int, dict]:
     return out
 
 
+async def library_tmdb_ids(client: httpx.AsyncClient) -> set[int]:
+    """TMDB ids of every movie in every Plex movie library (watched or not)."""
+    if not (config.PLEX_URL and config.PLEX_TOKEN):
+        return set()
+    headers = {"Accept": "application/json", "X-Plex-Token": config.PLEX_TOKEN}
+    r = await client.get(f"{config.PLEX_URL}/library/sections", headers=headers)
+    r.raise_for_status()
+    sections = [d["key"] for d in r.json()["MediaContainer"].get("Directory", []) if d.get("type") == "movie"]
+
+    ids: set[int] = set()
+    for key in sections:
+        start = 0
+        while True:
+            r = await client.get(
+                f"{config.PLEX_URL}/library/sections/{key}/all",
+                params={
+                    "type": 1,
+                    "includeGuids": 1,
+                    "X-Plex-Container-Start": start,
+                    "X-Plex-Container-Size": 1000,
+                },
+                headers=headers,
+            )
+            r.raise_for_status()
+            container = r.json().get("MediaContainer", {})
+            items = container.get("Metadata", [])
+            for it in items:
+                for g in it.get("Guid", []):
+                    gid = g.get("id", "")
+                    if gid.startswith("tmdb://"):
+                        ids.add(int(gid.removeprefix("tmdb://")))
+                        break
+            start += len(items)
+            if not items or start >= container.get("totalSize", 0):
+                break
+    log.info("plex: %d movies in library catalog", len(ids))
+    return ids
+
+
 async def _resolve(client: httpx.AsyncClient, rating_key: str, headers: dict) -> dict | None:
     try:
         r = await client.get(f"{config.PLEX_URL}/library/metadata/{rating_key}", headers=headers)

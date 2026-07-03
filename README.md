@@ -13,7 +13,9 @@ Jellyfin watch history.
    (`api.radarr.video`, TMDB-derived, no API key needed) and aggregates scores
    across all seeds, plus a genre taste-profile boost.
 4. Filters out: everything already in Radarr, Radarr's import exclusions,
-   everything you've watched, low-rated / low-vote / unreleased / too-short movies.
+   everything you've watched, everything already in your Plex/Jellyfin library
+   catalogs (even unwatched), and low-rated / low-vote / unreleased / too-short
+   movies.
 5. Serves the top picks (default 30) at `GET /api/list` in the exact format
    Radarr's **Custom Lists** import list consumes: `[{"id": <tmdbId>}, ...]`.
 

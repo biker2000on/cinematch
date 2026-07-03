@@ -57,11 +57,13 @@ async def _run_inner() -> dict:
     started = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
     async with httpx.AsyncClient(timeout=30) as client:
-        plex_hist, jf_hist, library, exclusions = await asyncio.gather(
+        plex_hist, jf_hist, library, exclusions, plex_lib, jf_lib = await asyncio.gather(
             plex.collect(client),
             jellyfin.collect(client),
             radarr.library_tmdb_ids(client),
             radarr.exclusion_tmdb_ids(client),
+            plex.library_tmdb_ids(client),
+            jellyfin.library_tmdb_ids(client),
         )
 
         # merge histories by tmdb id
@@ -100,7 +102,7 @@ async def _run_inner() -> dict:
 
         # accumulate candidates
         candidates: dict[int, dict] = {}
-        blocked = set(watched) | library | exclusions
+        blocked = set(watched) | library | exclusions | plex_lib | jf_lib
         for s, meta in zip(seeds, seed_metas):
             if not meta:
                 continue
@@ -163,6 +165,8 @@ async def _run_inner() -> dict:
         "jellyfin_watched": len(jf_hist),
         "seeds": len(seeds),
         "library_size": len(library),
+        "plex_library": len(plex_lib),
+        "jellyfin_library": len(jf_lib),
         "candidates": len(candidates),
         "recommendations": len(results),
         "genre_profile": dict(sorted(genre_profile.items(), key=lambda x: -x[1])[:8]),
